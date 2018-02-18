@@ -8,51 +8,30 @@ package MySystem;
 import com.taskadapter.redmineapi.AttachmentManager;
 import com.taskadapter.redmineapi.Include;
 import com.taskadapter.redmineapi.IssueManager;
-import com.taskadapter.redmineapi.Params;
-import com.taskadapter.redmineapi.ProjectManager;
 import com.taskadapter.redmineapi.RedmineException;
 import com.taskadapter.redmineapi.RedmineManager;
 import com.taskadapter.redmineapi.RedmineManagerFactory;
 import com.taskadapter.redmineapi.bean.Attachment;
-import com.taskadapter.redmineapi.bean.CustomFieldDefinition;
-import com.taskadapter.redmineapi.bean.CustomFieldFactory;
 import com.taskadapter.redmineapi.bean.Issue;
-import com.taskadapter.redmineapi.bean.IssueCategory;
-import com.taskadapter.redmineapi.bean.IssueCategoryFactory;
-import com.taskadapter.redmineapi.bean.IssueFactory;
-import com.taskadapter.redmineapi.bean.Journal;
-import com.taskadapter.redmineapi.bean.Project;
-import com.taskadapter.redmineapi.bean.Version;
-import com.taskadapter.redmineapi.bean.VersionFactory;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
-import static java.lang.System.out;
-import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLConnection;
-import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import static java.util.Arrays.stream;
 import java.util.Collection;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.apache.commons.codec.Charsets;
 import org.apache.http.entity.ContentType;
-import org.apache.http.message.BasicNameValuePair;
 
 public class ConnectionWithAPI  {
     
@@ -69,6 +48,7 @@ public class ConnectionWithAPI  {
     private IssueManager issueManager = mgr.getIssueManager();
     private AttachmentManager attachmentManager = mgr.getAttachmentManager();
     private List<Issue> issues; 
+    
 
     public ConnectionWithAPI () throws RedmineException {
         
@@ -82,15 +62,23 @@ public class ConnectionWithAPI  {
            
             for (Attachment attach : issueAttachments ) {
                 
-                String fileToManage = ".\\myFiles\\" +  attach.getFileName();
-                downloadAttachments(attach.getContentURL(), 
-                    apiAccessKey,
-                    fileToManage);
+               if ( checkAttachmentID(attach.getId()) == 0 ) {
                 
-                if (attach.getFileName().endsWith(".py")) {
-                    startPylint(attach.getFileName());
-                }
-                
+                    String fileToManage = ".\\myFiles\\" +  attach.getFileName();
+                    downloadAttachments(attach.getContentURL(), 
+                        apiAccessKey,
+                        fileToManage);
+
+                    if (attach.getFileName().endsWith(".py")) {
+                        startPylint(attach.getFileName());
+                    }
+                    if (attach.getFileName().endsWith(".java")){
+                        startCheckStyle(attach.getFileName());
+                    }
+               } else {
+                   continue;
+               }
+               
             }
              
     }
@@ -131,11 +119,21 @@ public class ConnectionWithAPI  {
         attachmentManager.addAttachmentToIssue(issue.getId(), file, ContentType.TEXT_PLAIN.getMimeType());
             
     }
+    
+    //срабатывает, но неверно загружает поток данных на сайт -- не как .zip файл
+    public void uploadAttachmentSonar (Issue issue, String path) throws RedmineException, IOException {
+        
+        String filename = path;
+        File file = new File(filename); 
+        // не работает пока что...
+        attachmentManager.addAttachmentToIssue(issue.getId(), file, ContentType.create("application/zip").getMimeType());
+        
+    }
 
     private void startPylint(String attachmentName) throws IOException {
-        String attachName = attachmentName; 
+        
         ProcessBuilder builder = new ProcessBuilder(
-                    "cmd.exe", "/c", "cd \"C:\\Projects\\MySystem\\myFiles\" && pylint " + attachName + ">report.txt");
+                    "cmd.exe", "/c", "cd \"C:\\Projects\\MySystem\\myFiles\" && pylint " + attachmentName + ">PythonErrorReport.txt");
                 builder.redirectErrorStream(true);
         Process p = builder.start();
         BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
@@ -147,7 +145,43 @@ public class ConnectionWithAPI  {
         }
                 
     }
-    
+    private void startCheckStyle (String attachmentName) throws IOException {
+        
+        ProcessBuilder builder = new ProcessBuilder(
+                    "cmd.exe", "/c", "cd \"C:\\Projects\\MySystem\\checkstyle\" && java -jar checkstyle-8.8-all.jar -c /sun_checks.xml \"C:\\Projects\\MySystem\\myFiles\" " 
+                            + attachmentName 
+                            + " > C:\\Projects\\MySystem\\myFiles\\JavaErrorReport.txt");
+                builder.redirectErrorStream(true);
+        Process p = builder.start();
+        BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line;
+        while (true) {
+            line = r.readLine();
+            if (line == null) { break; }
+            System.out.println(line);
+        }
+                
+    }
+
+    public int checkAttachmentID(Integer id) throws IOException {
+        List<String> attachmentIDs = new ArrayList<String>();
+        attachmentIDs = Files.readAllLines(Paths.get("AttachmentID.txt"), Charsets.UTF_8);
+        System.out.println(attachmentIDs); //проверка
+        int response = 0;
+        int id = 5;
+        for (String attach : attachmentIDs)  {
+            int idFromFile = Integer.parseInt(attach);
+            if (idFromFile == id) {
+                response =  1; //да, уже проверяли этот аттач
+                System.out.println("yes"); // проверка
+            } else {
+               response = 0; //нет, не проверяли
+               System.out.println("no"); //проверка
+               String fromIntToString = Integer.toString(id) + "\r\n";
+               Files.write(Paths.get("AttachmentID.txt"), fromIntToString.getBytes(), StandardOpenOption.APPEND); //занести id в файл
+            }
+        }
+    }
 }
 
 
