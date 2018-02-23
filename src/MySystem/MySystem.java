@@ -30,9 +30,9 @@ public class MySystem {
         ArrayList<Integer> attachID = new ArrayList<>();
         for (Issue issue : issues) {
             if (issue.getStatusName() != "Closed") {
-                System.out.println(issue.toString());
-                Collection<Attachment> attach = issue.getAttachments();
-                System.out.println(attach.toString());
+               System.out.println(issue.toString());
+               Collection<Attachment> attach = issue.getAttachments();
+               System.out.println(attach.toString());
                connection.saveAttachment(issue);
                
             }
@@ -40,6 +40,7 @@ public class MySystem {
         
         
        //connection.uploadAttachment(connection.getIssueByID(712686), "testingFile.txt");
-      connection.uploadAttachmentSonar(connection.getIssueByID(713276), "report.zip");
+      //connection.uploadAttachmentSonar(connection.getIssueByID(713276), "report.zip");
+      
     }   
 }

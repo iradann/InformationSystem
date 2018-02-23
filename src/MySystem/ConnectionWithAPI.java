@@ -61,26 +61,26 @@ public class ConnectionWithAPI  {
             dir.mkdirs();
            
             for (Attachment attach : issueAttachments ) {
+               
+               if ( attach.getFileName().endsWith(".py") || attach.getFileName().endsWith(".java") ){
                 
-               if ( checkAttachmentID(attach.getId()) == 0 ) {
-                
+                   if (checkAttachmentID(attach.getId()) == 0 ) {
                     String fileToManage = ".\\myFiles\\" +  attach.getFileName();
                     downloadAttachments(attach.getContentURL(), 
                         apiAccessKey,
                         fileToManage);
-
-                    if (attach.getFileName().endsWith(".py")) {
+                   }
+                    /*if (attach.getFileName().endsWith(".py")) {
                         startPylint(attach.getFileName());
                     }
                     if (attach.getFileName().endsWith(".java")){
                         startCheckStyle(attach.getFileName());
-                    }
+                    }*/
                } else {
                    continue;
                }
                
             }
-             
     }
     
     private void downloadAttachments(String url, String apikey, String fileName) throws MalformedURLException, IOException {
@@ -162,25 +162,27 @@ public class ConnectionWithAPI  {
         }
                 
     }
-
+    
     public int checkAttachmentID(Integer id) throws IOException {
         List<String> attachmentIDs = new ArrayList<String>();
         attachmentIDs = Files.readAllLines(Paths.get("AttachmentID.txt"), Charsets.UTF_8);
-        System.out.println(attachmentIDs); //проверка
         int response = 0;
-        int id = 5;
+        int attachWasCheckedBefore = 1;
+        int attachIsNew = 0;
+        
         for (String attach : attachmentIDs)  {
             int idFromFile = Integer.parseInt(attach);
             if (idFromFile == id) {
-                response =  1; //да, уже проверяли этот аттач
-                System.out.println("yes"); // проверка
+                response = attachWasCheckedBefore; //да, уже проверяли этот аттач
             } else {
-               response = 0; //нет, не проверяли
-               System.out.println("no"); //проверка
-               String fromIntToString = Integer.toString(id) + "\r\n";
-               Files.write(Paths.get("AttachmentID.txt"), fromIntToString.getBytes(), StandardOpenOption.APPEND); //занести id в файл
+               response = attachIsNew; //нет, не проверяли
             }
         }
+        if (response == attachIsNew) {
+            String fromIntToString = Integer.toString(id) + "\r\n";
+            Files.write(Paths.get("AttachmentID.txt"), fromIntToString.getBytes(), StandardOpenOption.APPEND); //занести id в файл
+        }
+        return response;
     }
 }
 
