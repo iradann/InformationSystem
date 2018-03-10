@@ -11,13 +11,9 @@ import com.taskadapter.redmineapi.bean.Attachment;
 import com.taskadapter.redmineapi.bean.Issue;
 import com.taskadapter.redmineapi.bean.Journal;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import org.apache.commons.codec.Charsets;
 
 public class MySystem {
     
@@ -26,6 +22,7 @@ public class MySystem {
        // frm.setVisible(true);
         
         ConnectionWithAPI connection = new ConnectionWithAPI(); 
+        connection.checkAttachmentID(269976);
         List<Issue> issues = connection.getIssues();
         ArrayList<Integer> attachID = new ArrayList<>();
         for (Issue issue : issues) {
@@ -34,13 +31,17 @@ public class MySystem {
                Collection<Attachment> attach = issue.getAttachments();
                System.out.println(attach.toString());
                connection.saveAttachment(issue);
-               
             }
         }
         
-        
-       //connection.uploadAttachment(connection.getIssueByID(712686), "testingFile.txt");
-      //connection.uploadAttachmentSonar(connection.getIssueByID(713276), "report.zip");
-      
+       Issue issue = connection.getIssueByID(730968);
+       Collection <Journal> journals = issue.getJournals();
+       for(Journal journal : journals) {
+           System.out.println(journal.getUser());
+           System.out.println(journal.toString());
+       }
+       //System.out.println(journals.toString());
+       System.out.println(issue.getUpdatedOn());
+
     }   
 }

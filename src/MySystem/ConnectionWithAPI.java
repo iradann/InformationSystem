@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -27,6 +28,8 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -69,13 +72,22 @@ public class ConnectionWithAPI  {
                     downloadAttachments(attach.getContentURL(), 
                         apiAccessKey,
                         fileToManage);
-                   }
-                    /*if (attach.getFileName().endsWith(".py")) {
-                        startPylint(attach.getFileName());
+                    if(attach.getFileName().endsWith(".py")){
+                        new MyPLint().startPylint(attach.getFileName());
+                        this.uploadAttachment(issue, ".\\myFiles\\" + "PythonErrorReport.txt");
+                        //вывод финального статуса в журнал от имени текущего аккаунта
+                        
                     }
-                    if (attach.getFileName().endsWith(".java")){
-                        startCheckStyle(attach.getFileName());
-                    }*/
+                    if(attach.getFileName().endsWith(".java")){
+                        ///////////////Дописать///////////////////
+                        new MyPLint().startPylint(attach.getFileName());
+                        this.uploadAttachment(issue, ".\\myFiles\\" + "PythonErrorReport.txt");
+                    }
+                    cleanDirectory(new  File(".\\myFiles\\"));
+                   }
+                   //вызов аналзатора
+                   //отправка отчета
+                   //очистить папку
                } else {
                    continue;
                }
@@ -103,7 +115,7 @@ public class ConnectionWithAPI  {
     }
 
     public List<Issue> getIssues() throws RedmineException {
-        issues = issueManager.getIssues(projectKey, queryId, Include.journals, Include.attachments );
+        issues = issueManager.getIssues(projectKey, queryId, Include.journals, Include.attachments);
         return issues;
     }
     
@@ -112,11 +124,17 @@ public class ConnectionWithAPI  {
         return issue;
     }
     
-    public void uploadAttachment (Issue issue, String path) throws RedmineException, IOException {
+    public void uploadAttachment (Issue issue, String path) {
         
-        String filename = path;
-        File file = new File(filename); 
-        attachmentManager.addAttachmentToIssue(issue.getId(), file, ContentType.TEXT_PLAIN.getMimeType());
+        try {
+            String filename = path;
+            File file = new File(filename);
+            attachmentManager.addAttachmentToIssue(issue.getId(), file, ContentType.TEXT_PLAIN.getMimeType());
+        } catch (RedmineException ex) {
+            Logger.getLogger(ConnectionWithAPI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(ConnectionWithAPI.class.getName()).log(Level.SEVERE, null, ex);
+        }
             
     }
     
@@ -130,21 +148,7 @@ public class ConnectionWithAPI  {
         
     }
 
-    private void startPylint(String attachmentName) throws IOException {
-        
-        ProcessBuilder builder = new ProcessBuilder(
-                    "cmd.exe", "/c", "cd \"C:\\Projects\\MySystem\\myFiles\" && pylint " + attachmentName + ">PythonErrorReport.txt");
-                builder.redirectErrorStream(true);
-        Process p = builder.start();
-        BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line;
-        while (true) {
-            line = r.readLine();
-            if (line == null) { break; }
-            System.out.println(line);
-        }
-                
-    }
+   
     private void startCheckStyle (String attachmentName) throws IOException {
         
         ProcessBuilder builder = new ProcessBuilder(
@@ -174,6 +178,7 @@ public class ConnectionWithAPI  {
             int idFromFile = Integer.parseInt(attach);
             if (idFromFile == id) {
                 response = attachWasCheckedBefore; //да, уже проверяли этот аттач
+                break;
             } else {
                response = attachIsNew; //нет, не проверяли
             }
@@ -181,8 +186,32 @@ public class ConnectionWithAPI  {
         if (response == attachIsNew) {
             String fromIntToString = Integer.toString(id) + "\r\n";
             Files.write(Paths.get("AttachmentID.txt"), fromIntToString.getBytes(), StandardOpenOption.APPEND); //занести id в файл
+            
         }
         return response;
+    }
+    private void removeDirectory(File dir) {
+    if (dir.isDirectory()) {
+        File[] files = dir.listFiles();
+        if (files != null && files.length > 0) {
+            for (File aFile : files) {
+                removeDirectory(aFile);
+            }
+        }
+        dir.delete();
+    } else {
+        dir.delete();
+    }
+    }
+    private void cleanDirectory(File dir) {
+    if (dir.isDirectory()) {
+        File[] files = dir.listFiles();
+        if (files != null && files.length > 0) {
+            for (File aFile : files) {
+                removeDirectory(aFile);
+            }
+        }
+    }
     }
 }
 
