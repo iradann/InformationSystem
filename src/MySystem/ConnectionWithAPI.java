@@ -6,14 +6,15 @@
 package MySystem;
 
 import com.taskadapter.redmineapi.AttachmentManager;
+import com.taskadapter.redmineapi.CustomFieldManager;
 import com.taskadapter.redmineapi.Include;
 import com.taskadapter.redmineapi.IssueManager;
 import com.taskadapter.redmineapi.RedmineException;
 import com.taskadapter.redmineapi.RedmineManager;
 import com.taskadapter.redmineapi.RedmineManagerFactory;
 import com.taskadapter.redmineapi.bean.Attachment;
+import com.taskadapter.redmineapi.bean.CustomFieldDefinition;
 import com.taskadapter.redmineapi.bean.Issue;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,67 +37,83 @@ import okhttp3.Response;
 import org.apache.commons.codec.Charsets;
 import org.apache.http.entity.ContentType;
 
-public class ConnectionWithAPI  {
-    
+public class ConnectionWithAPI {
+
     /* Если перенести инициализацию этих переменных в MySystem и задавать как
         connection.uri = "...";
         то программа не компилируется
-    */
+     */
     String uri = "http://www.hostedredmine.com";
     String apiAccessKey = "f4b2a2953034f344cb45c08359ee76577dc20977";
     String projectKey = "1a1a";
     Integer queryId = null;
-    
+
     private RedmineManager mgr = RedmineManagerFactory.createWithApiKey(uri, apiAccessKey);
     private IssueManager issueManager = mgr.getIssueManager();
     private AttachmentManager attachmentManager = mgr.getAttachmentManager();
-    private List<Issue> issues; 
+    private List<Issue> issues;
     
+    
+    public ConnectionWithAPI() throws RedmineException {
 
-    public ConnectionWithAPI () throws RedmineException {
-        
     }
 
-    public void saveAttachment (Issue issue) throws IOException {
-            Collection<Attachment> issueAttachment = issue.getAttachments();
-            ArrayList<Attachment> issueAttachments = new ArrayList<>(issueAttachment);
-            File dir = new File(".\\myFiles\\");
-            dir.mkdirs();
-           
-            for (Attachment attach : issueAttachments ) {
-               
-               if ( attach.getFileName().endsWith(".py") || attach.getFileName().endsWith(".java") ){
-                
-                   if (checkAttachmentID(attach.getId()) == 0 ) {
-                    String fileToManage = ".\\myFiles\\" +  attach.getFileName();
-                    downloadAttachments(attach.getContentURL(), 
-                        apiAccessKey,
-                        fileToManage);
-                    if(attach.getFileName().endsWith(".py")){
+    public void saveAttachment(Issue issue) throws IOException {
+        Collection<Attachment> issueAttachment = issue.getAttachments();
+        ArrayList<Attachment> issueAttachments = new ArrayList<>(issueAttachment);
+        File dir = new File(".\\myFiles\\");
+        dir.mkdirs();
+
+        for (Attachment attach : issueAttachments) {
+
+            if (attach.getFileName().endsWith(".py") || attach.getFileName().endsWith(".java")) {
+
+                if (checkAttachmentID(attach.getId()) == 0) {
+
+                    String fileToManage = ".\\myFiles\\" + attach.getFileName();
+                    downloadAttachments(attach.getContentURL(),
+                            apiAccessKey,
+                            fileToManage);
+
+                    if (attach.getFileName().endsWith(".py")) {
                         new MyPLint().startPylint(attach.getFileName());
-                        this.uploadAttachment(issue, ".\\myFiles\\" + "PythonErrorReport.txt");
+                        this.uploadAttachment(issue, ".\\myFiles\\" + attach.getFileName() + ".txt");
+                        String result = readLastLineInFile(".\\myFiles\\" + attach.getFileName() + ".txt");
+                        issue.setNotes(result);
+                        this.updateIssue(issue);
                         //вывод финального статуса в журнал от имени текущего аккаунта
-                        
+
                     }
-                    if(attach.getFileName().endsWith(".java")){
-                        ///////////////Дописать///////////////////
-                        new MyPLint().startPylint(attach.getFileName());
-                        this.uploadAttachment(issue, ".\\myFiles\\" + "PythonErrorReport.txt");
+
+                    if (attach.getFileName().endsWith(".java")) {
+                        new MyCheckStyle().startCheckStyle(attach.getFileName());
+                        this.uploadAttachment(issue, "C:\\Projects\\MySystem\\myFiles\\" + attach.getFileName() + ".txt");
                     }
-                    cleanDirectory(new  File(".\\myFiles\\"));
-                   }
-                   //вызов аналзатора
-                   //отправка отчета
-                   //очистить папку
-               } else {
-                   continue;
-               }
-               
+                    //cleanDirectory(new File(".\\myFiles\\"));
+                }
+            } else {
+                continue;
             }
+
+        }
+    } 
+public void saveAttachment2(Issue issue) throws IOException {
+        Collection<Attachment> issueAttachment = issue.getAttachments();
+        ArrayList<Attachment> issueAttachments = new ArrayList<>(issueAttachment);
+        File dir = new File(".\\myFiles\\");
+        dir.mkdirs();
+
+        for (Attachment attach : issueAttachments) {
+            if (attach.getFileName().endsWith(".java") || attach.getFileName().endsWith(".py") ) {
+                    String fileToManage = ".\\myFiles\\" + attach.getFileName();
+                    downloadAttachments(attach.getContentURL(),
+                            apiAccessKey,
+                            fileToManage);
+            } else continue;
+        }
     }
-    
     private void downloadAttachments(String url, String apikey, String fileName) throws MalformedURLException, IOException {
-       
+
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder()
                 .url(url)
@@ -111,21 +128,22 @@ public class ConnectionWithAPI  {
             Path to = Paths.get(fileName); //convert from String to Path
             Files.copy(in, to, StandardCopyOption.REPLACE_EXISTING);
         }
-        
+
     }
 
     public List<Issue> getIssues() throws RedmineException {
-        issues = issueManager.getIssues(projectKey, queryId, Include.journals, Include.attachments);
+        issues = issueManager.getIssues(projectKey, queryId, Include.journals, Include.attachments, Include.changesets);
         return issues;
     }
-    
+
     public Issue getIssueByID(int issueID) throws RedmineException {
         Issue issue = issueManager.getIssueById(issueID, Include.journals);
         return issue;
     }
-    
-    public void uploadAttachment (Issue issue, String path) {
-        
+   
+
+    public void uploadAttachment(Issue issue, String path) {
+
         try {
             String filename = path;
             File file = new File(filename);
@@ -135,84 +153,77 @@ public class ConnectionWithAPI  {
         } catch (IOException ex) {
             Logger.getLogger(ConnectionWithAPI.class.getName()).log(Level.SEVERE, null, ex);
         }
-            
-    }
-    
-    //срабатывает, но неверно загружает поток данных на сайт -- не как .zip файл
-    public void uploadAttachmentSonar (Issue issue, String path) throws RedmineException, IOException {
-        
-        String filename = path;
-        File file = new File(filename); 
-        // не работает пока что...
-        attachmentManager.addAttachmentToIssue(issue.getId(), file, ContentType.create("application/zip").getMimeType());
-        
+
     }
 
-   
-    private void startCheckStyle (String attachmentName) throws IOException {
-        
-        ProcessBuilder builder = new ProcessBuilder(
-                    "cmd.exe", "/c", "cd \"C:\\Projects\\MySystem\\checkstyle\" && java -jar checkstyle-8.8-all.jar -c /sun_checks.xml \"C:\\Projects\\MySystem\\myFiles\" " 
-                            + attachmentName 
-                            + " > C:\\Projects\\MySystem\\myFiles\\JavaErrorReport.txt");
-                builder.redirectErrorStream(true);
-        Process p = builder.start();
-        BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line;
-        while (true) {
-            line = r.readLine();
-            if (line == null) { break; }
-            System.out.println(line);
-        }
-                
+    //срабатывает, но неверно загружает поток данных на сайт -- не как .zip файл
+    public void uploadAttachmentSonar(Issue issue, String path) throws RedmineException, IOException {
+
+        String filename = path;
+        File file = new File(filename);
+        // не работает пока что...
+        attachmentManager.addAttachmentToIssue(issue.getId(), file, ContentType.create("application/zip").getMimeType());
+
     }
-    
+
     public int checkAttachmentID(Integer id) throws IOException {
         List<String> attachmentIDs = new ArrayList<String>();
         attachmentIDs = Files.readAllLines(Paths.get("AttachmentID.txt"), Charsets.UTF_8);
         int response = 0;
         int attachWasCheckedBefore = 1;
         int attachIsNew = 0;
-        
-        for (String attach : attachmentIDs)  {
+
+        for (String attach : attachmentIDs) {
             int idFromFile = Integer.parseInt(attach);
             if (idFromFile == id) {
                 response = attachWasCheckedBefore; //да, уже проверяли этот аттач
                 break;
             } else {
-               response = attachIsNew; //нет, не проверяли
+                response = attachIsNew; //нет, не проверяли
             }
         }
         if (response == attachIsNew) {
             String fromIntToString = Integer.toString(id) + "\r\n";
             Files.write(Paths.get("AttachmentID.txt"), fromIntToString.getBytes(), StandardOpenOption.APPEND); //занести id в файл
-            
+
         }
         return response;
     }
+
     private void removeDirectory(File dir) {
-    if (dir.isDirectory()) {
-        File[] files = dir.listFiles();
-        if (files != null && files.length > 0) {
-            for (File aFile : files) {
-                removeDirectory(aFile);
+        if (dir.isDirectory()) {
+            File[] files = dir.listFiles();
+            if (files != null && files.length > 0) {
+                for (File aFile : files) {
+                    removeDirectory(aFile);
+                }
             }
+            dir.delete();
+        } else {
+            dir.delete();
         }
-        dir.delete();
-    } else {
-        dir.delete();
     }
-    }
+
     private void cleanDirectory(File dir) {
-    if (dir.isDirectory()) {
-        File[] files = dir.listFiles();
-        if (files != null && files.length > 0) {
-            for (File aFile : files) {
-                removeDirectory(aFile);
+        if (dir.isDirectory()) {
+            File[] files = dir.listFiles();
+            if (files != null && files.length > 0) {
+                for (File aFile : files) {
+                    removeDirectory(aFile);
+                }
             }
         }
     }
+    
+    private String readLastLineInFile(String filename) {
+        return "To do read result from filename";
+    }
+    
+    public void updateIssue(Issue issue) {
+        try {
+            issueManager.update(issue);
+        } catch (RedmineException ex) {
+            Logger.getLogger(ConnectionWithAPI.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
 }
-
-

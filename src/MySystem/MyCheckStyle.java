@@ -13,15 +13,18 @@ import java.io.InputStreamReader;
  *
  * @author user
  */
-public class MyPLint {
+class MyCheckStyle {
+
+    public MyCheckStyle() {
+    }
     
-     public  MyPLint(){
-     }
-     
-     public void startPylint(String attachmentName) throws IOException {
+    
+    public void startCheckStyle (String attachmentName) throws IOException {
         
         ProcessBuilder builder = new ProcessBuilder(
-                    "cmd.exe", "/c", "cd \"C:\\Projects\\MySystem\\myFiles\" && pylint " + attachmentName + ">" + attachmentName + ".txt");
+                    "cmd.exe", "/c", "cd \"C:\\Projects\\MySystem\\checkstyle\" && java -jar checkstyle-8.8-all.jar -c /sun_checks.xml \"C:\\Projects\\MySystem\\myFiles\" " 
+                            + attachmentName 
+                            + " > C:\\Projects\\MySystem\\myFiles\\" + attachmentName + ".txt");
                 builder.redirectErrorStream(true);
         Process p = builder.start();
         BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
