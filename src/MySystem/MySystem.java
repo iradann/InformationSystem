@@ -3,7 +3,6 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package MySystem;
 
 import com.taskadapter.redmineapi.RedmineException;
@@ -20,37 +19,24 @@ import java.util.Scanner;
 import static jdk.nashorn.tools.ShellFunctions.input;
 
 public class MySystem {
-    
+
     public static void main(String[] args) throws RedmineException, IOException {
-        //Frame frm = new Frame();
-       // frm.setVisible(true);
         
-        ConnectionWithAPI connection = new ConnectionWithAPI(); 
+
+        ConnectionWithAPI connection = new ConnectionWithAPI();
         List<Issue> issues = connection.getIssues();
         ArrayList<Integer> attachID = new ArrayList<>();
-        //System.out.println("From which target version you need to get issue, type:");
-        //Scanner in = new Scanner(System.in);
-        //String sometext = in.nextLine();
-        
+        System.out.println("From which target version you need to get issues, type:");
+        Scanner in = new Scanner(System.in, "Windows-1251");
+        String inputTargetVersion = in.nextLine();
+
         for (Issue issue : issues) {
-             if (issue.getStatusName() != "Closed" ) {
-               //Collection<Attachment> attach = issue.getAttachments();
-               //System.out.println(attach.toString());
-               //connection.saveAttachment(issue);
-              
-               Collection<Attachment> attach = issue.getAttachments();
-               Version version = issue.getTargetVersion();
-               System.out.println(issue.toString());
-               System.out.println(version);
-               if (version  == null) {
-                       System.out.println("net nichego");
-               } else if (version.getName().equals("Контрольная работа")) {
-                            connection.saveAttachment(issue);
-                       };
-                
-               
-            } 
+            if (issue.getStatusName() != "Closed" && issue.getStatusName() != "Approved") {
+                System.out.println(issue.toString());
+                connection.setVersionForCheck(inputTargetVersion, issue);
+                System.out.println(issue.getAuthorName());
+            }
         }
-        
-    }   
+
+    }
 }

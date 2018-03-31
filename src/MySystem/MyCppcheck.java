@@ -13,18 +13,15 @@ import java.io.InputStreamReader;
  *
  * @author user
  */
-class MyCheckStyle {
-
-    public MyCheckStyle() {
+public class MyCppcheck {
+    
+    public MyCppcheck() {
     }
     
-    
-    public void startCheckStyle (String attachmentName) throws IOException {
+    public void startCppcheck(String attachmentName) throws IOException {
         
         ProcessBuilder builder = new ProcessBuilder(
-                    "cmd.exe", "/c", "cd \"C:\\Projects\\MySystem\\checkstyle\" && java -jar checkstyle-8.8-all.jar -c /sun_checks.xml \"C:\\Projects\\MySystem\\myFiles\" " 
-                            + attachmentName 
-                            + " > C:\\Projects\\MySystem\\myFiles\\" + attachmentName + "_errorReport.txt");
+                    "cmd.exe", "/c", "cd \"C:\\Projects\\MySystem\\myFiles\" && cppcheck --output-file=" + attachmentName + "_errorReport.txt " + attachmentName);
                 builder.redirectErrorStream(true);
         Process p = builder.start();
         BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
@@ -34,6 +31,6 @@ class MyCheckStyle {
             if (line == null) { break; }
             System.out.println(line);
         }
-                
-    }
+    }    
+    
 }

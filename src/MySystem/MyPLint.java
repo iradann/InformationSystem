@@ -21,7 +21,7 @@ public class MyPLint {
      public void startPylint(String attachmentName) throws IOException {
         
         ProcessBuilder builder = new ProcessBuilder(
-                    "cmd.exe", "/c", "cd \"C:\\Projects\\MySystem\\myFiles\" && pylint " + attachmentName + ">" + attachmentName + ".txt");
+                    "cmd.exe", "/c", "cd \"C:\\Projects\\MySystem\\myFiles\" && pylint " + attachmentName + ">" + attachmentName + "_errorReport.txt");
                 builder.redirectErrorStream(true);
         Process p = builder.start();
         BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));

@@ -6,21 +6,18 @@
 package MySystem;
 
 import com.taskadapter.redmineapi.AttachmentManager;
-import com.taskadapter.redmineapi.CustomFieldManager;
 import com.taskadapter.redmineapi.Include;
 import com.taskadapter.redmineapi.IssueManager;
 import com.taskadapter.redmineapi.RedmineException;
 import com.taskadapter.redmineapi.RedmineManager;
 import com.taskadapter.redmineapi.RedmineManagerFactory;
 import com.taskadapter.redmineapi.bean.Attachment;
-import com.taskadapter.redmineapi.bean.CustomFieldDefinition;
 import com.taskadapter.redmineapi.bean.Issue;
+import com.taskadapter.redmineapi.bean.Version;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.MalformedURLException;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -43,17 +40,16 @@ public class ConnectionWithAPI {
         connection.uri = "...";
         то программа не компилируется
      */
-    String uri = "http://www.hostedredmine.com";
+    String url = "http://www.hostedredmine.com";
     String apiAccessKey = "f4b2a2953034f344cb45c08359ee76577dc20977";
     String projectKey = "1a1a";
     Integer queryId = null;
 
-    private RedmineManager mgr = RedmineManagerFactory.createWithApiKey(uri, apiAccessKey);
+    private RedmineManager mgr = RedmineManagerFactory.createWithApiKey(url, apiAccessKey);
     private IssueManager issueManager = mgr.getIssueManager();
     private AttachmentManager attachmentManager = mgr.getAttachmentManager();
     private List<Issue> issues;
-    
-    
+
     public ConnectionWithAPI() throws RedmineException {
 
     }
@@ -66,7 +62,7 @@ public class ConnectionWithAPI {
 
         for (Attachment attach : issueAttachments) {
 
-            if (attach.getFileName().endsWith(".py") || attach.getFileName().endsWith(".java")) {
+            if (attach.getFileName().endsWith(".py") || attach.getFileName().endsWith(".java") || attach.getFileName().endsWith(".cpp")) {
 
                 if (checkAttachmentID(attach.getId()) == 0) {
 
@@ -74,44 +70,42 @@ public class ConnectionWithAPI {
                     downloadAttachments(attach.getContentURL(),
                             apiAccessKey,
                             fileToManage);
-
+                 
                     if (attach.getFileName().endsWith(".py")) {
                         new MyPLint().startPylint(attach.getFileName());
-                        this.uploadAttachment(issue, ".\\myFiles\\" + attach.getFileName() + ".txt");
-                        String result = readLastLineInFile(".\\myFiles\\" + attach.getFileName() + ".txt");
+                        this.uploadAttachment(issue, ".\\myFiles\\" + attach.getFileName() + "_errorReport.txt");
+                        String result = readLastLineInFile(".\\myFiles\\" + attach.getFileName() + "_errorReport.txt");
                         issue.setNotes(result);
                         this.updateIssue(issue);
-                        //вывод финального статуса в журнал от имени текущего аккаунта
 
                     }
 
                     if (attach.getFileName().endsWith(".java")) {
                         new MyCheckStyle().startCheckStyle(attach.getFileName());
-                        this.uploadAttachment(issue, "C:\\Projects\\MySystem\\myFiles\\" + attach.getFileName() + ".txt");
+                        this.uploadAttachment(issue, "C:\\Projects\\MySystem\\myFiles\\" + attach.getFileName() + "_errorReport.txt");
+                        String result = readLastLineInFile(".\\myFiles\\" + attach.getFileName() + "_errorReport.txt");
+                        issue.setNotes(result);
+                        this.updateIssue(issue);
                     }
-                    //cleanDirectory(new File(".\\myFiles\\"));
+                    
+                    if (attach.getFileName().endsWith(".cpp")) {
+                        new MyCppcheck().startCppcheck(attach.getFileName());
+                        this.uploadAttachment(issue, ".\\myFiles\\" + attach.getFileName() + "_errorReport.txt");
+                        String result = "Checked. See the report (.txt) for more details";
+                        issue.setNotes(result);
+                        this.updateIssue(issue);
+
+                    }
+                    cleanDirectory(new File(".\\myFiles\\"));
+                
                 }
             } else {
                 continue;
             }
 
         }
-    } 
-public void saveAttachment2(Issue issue) throws IOException {
-        Collection<Attachment> issueAttachment = issue.getAttachments();
-        ArrayList<Attachment> issueAttachments = new ArrayList<>(issueAttachment);
-        File dir = new File(".\\myFiles\\");
-        dir.mkdirs();
-
-        for (Attachment attach : issueAttachments) {
-            if (attach.getFileName().endsWith(".java") || attach.getFileName().endsWith(".py") ) {
-                    String fileToManage = ".\\myFiles\\" + attach.getFileName();
-                    downloadAttachments(attach.getContentURL(),
-                            apiAccessKey,
-                            fileToManage);
-            } else continue;
-        }
     }
+
     private void downloadAttachments(String url, String apikey, String fileName) throws MalformedURLException, IOException {
 
         OkHttpClient client = new OkHttpClient();
@@ -140,7 +134,6 @@ public void saveAttachment2(Issue issue) throws IOException {
         Issue issue = issueManager.getIssueById(issueID, Include.journals);
         return issue;
     }
-   
 
     public void uploadAttachment(Issue issue, String path) {
 
@@ -176,15 +169,15 @@ public void saveAttachment2(Issue issue) throws IOException {
         for (String attach : attachmentIDs) {
             int idFromFile = Integer.parseInt(attach);
             if (idFromFile == id) {
-                response = attachWasCheckedBefore; //да, уже проверяли этот аттач
+                response = attachWasCheckedBefore; 
                 break;
             } else {
-                response = attachIsNew; //нет, не проверяли
+                response = attachIsNew; 
             }
         }
         if (response == attachIsNew) {
             String fromIntToString = Integer.toString(id) + "\r\n";
-            Files.write(Paths.get("AttachmentID.txt"), fromIntToString.getBytes(), StandardOpenOption.APPEND); //занести id в файл
+            Files.write(Paths.get("AttachmentID.txt"), fromIntToString.getBytes(), StandardOpenOption.APPEND); 
 
         }
         return response;
@@ -214,16 +207,54 @@ public void saveAttachment2(Issue issue) throws IOException {
             }
         }
     }
-    
-    private String readLastLineInFile(String filename) {
-        return "To do read result from filename";
+
+    private String readLastLineInFile(String fileDir) {
+        List<String> lines = new ArrayList<String>();
+        try {
+            lines = Files.readAllLines(Paths.get(fileDir), Charsets.UTF_8);
+        } catch (IOException ex) {
+            Logger.getLogger(ConnectionWithAPI.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        String result = null;
+        for (int i = lines.size() - 1; i >= 0; i--) {
+            if (!lines.get(i).isEmpty()) {
+                result = lines.get(i);
+                break;
+            } else {
+                continue;
+            }
+        }
+        
+        return result;
     }
-    
+
     public void updateIssue(Issue issue) {
         try {
             issueManager.update(issue);
         } catch (RedmineException ex) {
             Logger.getLogger(ConnectionWithAPI.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    public void setVersionForCheck(String inputTargetVersion, Issue issue) {
+
+        Version version = issue.getTargetVersion();
+        Collection<Attachment> attach = issue.getAttachments();
+
+        if (inputTargetVersion.equals("All")) {
+            try {
+                this.saveAttachment(issue);
+            } catch (IOException ex) {
+                Logger.getLogger(ConnectionWithAPI.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        } else if (version == null) {
+            System.out.println("Issue without target version");
+        } else if (version.getName().equals(inputTargetVersion)) {
+            try {
+                this.saveAttachment(issue);
+            } catch (IOException ex) {
+                Logger.getLogger(ConnectionWithAPI.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
     }
 }
